@@ -80,16 +80,26 @@ func main() {
 	}
 	defer file.Close()
 
-	var items []list.Item
+	var rawLines []string
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if idx := strings.Index(line, ";"); idx != -1 {
-			items = append(items, historyItem(line[idx+1:]))
+			rawLines = append(rawLines, line[idx+1:])
 		} else {
-			items = append(items, historyItem(line))
+			rawLines = append(rawLines, line)
 		}
+	}
+
+	// Reverse the slice
+	for i, j := 0, len(rawLines)-1; i < j; i, j = i+1, j-1 {
+		rawLines[i], rawLines[j] = rawLines[j], rawLines[i]
+	}
+
+	var items []list.Item
+	for _, line := range rawLines {
+		items = append(items, historyItem(line))
 	}
 
 	if err := scanner.Err(); err != nil {
