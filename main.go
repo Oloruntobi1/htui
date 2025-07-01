@@ -52,6 +52,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return tea.Quit()
 				}
 			}
+		case "y":
+			if selected, ok := m.list.SelectedItem().(historyItem); ok {
+				copyToClipboard(string(selected))
+			}
+
 		}
 	}
 
@@ -70,6 +75,31 @@ func runCommand(cmdStr string) {
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 	_ = cmd.Run()
+}
+
+func copyToClipboard(text string) {
+	var cmd *exec.Cmd
+
+	if _, err := exec.LookPath("pbcopy"); err == nil {
+		cmd = exec.Command("pbcopy")
+	} else if _, err := exec.LookPath("xclip"); err == nil {
+		cmd = exec.Command("xclip", "-selection", "clipboard")
+	} else {
+		return // no supported clipboard tool
+	}
+
+	in, err := cmd.StdinPipe()
+	if err != nil {
+		return
+	}
+
+	if err := cmd.Start(); err != nil {
+		return
+	}
+
+	_, _ = in.Write([]byte(text))
+	_ = in.Close()
+	_ = cmd.Wait()
 }
 
 func main() {
