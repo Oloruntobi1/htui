@@ -7,39 +7,37 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/viewport"
+	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+type historyItem string
+
+func (h historyItem) Title() string       { return string(h) }
+func (h historyItem) Description() string { return "" }
+func (h historyItem) FilterValue() string { return string(h) }
+
 type model struct {
-	historyView viewport.Model // this will be scrollable
+	list list.Model
 }
 
-func initializeModel(hist string) model {
-	m := model{
-		historyView: viewport.New(0, 0),
-	}
-
-	m.historyView.SetContent(hist)
-
-	return m
+func initializeModel(items []list.Item) model {
+	const defaultWidth = 20
+	l := list.New(items, list.NewDefaultDelegate(), defaultWidth, 10)
+	l.Title = "Command History"
+	l.SetShowStatusBar(false)
+	l.SetFilteringEnabled(true)
+	return model{list: l}
 }
 
 func (m model) Init() tea.Cmd {
 	return nil
 }
 
-func (m model) View() string {
-	return m.historyView.View()
-}
-
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
-	var cmds []tea.Cmd
 	switch e := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.historyView.Width = e.Width
-		m.historyView.Height = e.Height
+		m.list.SetSize(e.Width, e.Height)
 	case tea.KeyMsg:
 		switch e.String() {
 		case "ctrl-c", "q":
@@ -47,9 +45,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	m.historyView, cmd = m.historyView.Update(msg)
-	cmds = append(cmds, cmd)
-	return m, tea.Batch(cmds...)
+	var cmd tea.Cmd
+	m.list, cmd = m.list.Update(msg)
+	return m, cmd
+}
+
+func (m model) View() string {
+	return m.list.View()
 }
 
 func main() {
@@ -60,15 +62,15 @@ func main() {
 	}
 	defer file.Close()
 
-	var str strings.Builder
+	var items []list.Item
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if idx := strings.Index(line, ";"); idx != -1 {
-			str.WriteString(line[idx+1:] + "\n")
+			items = append(items, historyItem(line[idx+1:]))
 		} else {
-			str.WriteString(line + "\n")
+			items = append(items, historyItem(line))
 		}
 	}
 
@@ -76,12 +78,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	m := initializeModel(str.String())
+	m := initializeModel(items)
 
 	program := tea.NewProgram(m, tea.WithAltScreen())
-
-	_, err = program.Run()
-	if err != nil {
+	if _, err := program.Run(); err != nil {
 		log.Fatal(err)
 	}
 }
