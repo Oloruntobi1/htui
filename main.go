@@ -1,7 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"log"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -11,10 +15,14 @@ type model struct {
 	historyView viewport.Model // this will be scrollable
 }
 
-func initializeModel() model {
-	return model{
+func initializeModel(hist string) model {
+	m := model{
 		historyView: viewport.New(0, 0),
 	}
+
+	m.historyView.SetContent(hist)
+
+	return m
 }
 
 func (m model) Init() tea.Cmd {
@@ -22,11 +30,14 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) View() string {
-	return ""
+	return m.historyView.View()
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch e := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.historyView.Width = e.Width
+		m.historyView.Height = e.Height
 	case tea.KeyMsg:
 		switch e.String() {
 		case "ctrl-c", "q":
@@ -37,11 +48,34 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func main() {
-	m := initializeModel()
+	historyPath := filepath.Join(os.Getenv("HOME"), ".zsh_history")
+	file, err := os.Open(historyPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	var str strings.Builder
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if idx := strings.Index(line, ";"); idx != -1 {
+			str.WriteString(line[idx+1:] + "\n")
+		} else {
+			str.WriteString(line + "\n")
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		log.Fatal(err)
+	}
+
+	m := initializeModel(str.String())
 
 	program := tea.NewProgram(m, tea.WithAltScreen())
 
-	_, err := program.Run()
+	_, err = program.Run()
 	if err != nil {
 		log.Fatal(err)
 	}
