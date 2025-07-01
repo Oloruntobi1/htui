@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
@@ -19,8 +20,11 @@ func (h historyItem) Description() string { return "" }
 func (h historyItem) FilterValue() string { return string(h) }
 
 type model struct {
-	list list.Model
+	list   list.Model
+	copied bool
 }
+
+type copiedMsg struct{}
 
 func initializeModel(items []list.Item) model {
 	const defaultWidth = 20
@@ -40,6 +44,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.list.SetSize(e.Width, e.Height)
 
+	case copiedMsg:
+		m.copied = false
+		return m, nil
+
 	case tea.KeyMsg:
 		switch e.String() {
 		case "ctrl-c", "q":
@@ -55,6 +63,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "y":
 			if selected, ok := m.list.SelectedItem().(historyItem); ok {
 				copyToClipboard(string(selected))
+				m.copied = true
+				return m, func() tea.Msg {
+					time.Sleep(700 * time.Millisecond)
+					return copiedMsg{}
+				}
 			}
 
 		}
@@ -66,7 +79,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	return m.list.View()
+	help := "\n ↑/↓ navigate • y yank • enter run • q quit"
+	if m.copied {
+		help = "\n Copied!"
+	}
+	return m.list.View() + help
 }
 
 func runCommand(cmdStr string) {
