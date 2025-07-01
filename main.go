@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -38,10 +39,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch e := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.list.SetSize(e.Width, e.Height)
+
 	case tea.KeyMsg:
 		switch e.String() {
 		case "ctrl-c", "q":
 			return m, tea.Quit
+
+		case "enter":
+			if selected, ok := m.list.SelectedItem().(historyItem); ok {
+				return m, func() tea.Msg {
+					runCommand(string(selected))
+					return tea.Quit()
+				}
+			}
 		}
 	}
 
@@ -52,6 +62,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	return m.list.View()
+}
+
+func runCommand(cmdStr string) {
+	cmd := exec.Command("zsh", "-c", cmdStr)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	_ = cmd.Run()
 }
 
 func main() {
