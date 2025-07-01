@@ -26,6 +26,13 @@ func (m model) View() string {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch e := msg.(type) {
+	case tea.KeyMsg:
+		switch e.String() {
+		case "ctrl-c", "q":
+			return m, tea.Quit
+		}
+	}
 	return m, nil
 }
 
